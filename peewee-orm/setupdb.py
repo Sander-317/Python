@@ -13,7 +13,7 @@ def main():
     Comment out the fuction you are not using and run the file.
     """
     # setup_data()
-    # delete_database()
+    delete_database()
 
 
 def setup_data():

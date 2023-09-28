@@ -15,18 +15,26 @@ def cheapest_dish() -> models.Dish:
     Query the database to retrieve the cheapest dish available
     """
 
-    query = (
+    return (
         models.Dish.select(models.Dish.id, models.Dish.price_in_cents)
         .order_by(models.Dish.price_in_cents.asc())
-        .limit(1)
+        .first()
     )
-    for dish in query:
-        return dish
-    # return query.id
-    ...
 
 
-# cheapest_dish()
+def find_dish_diet_preference(dish_ingredient_dict, preference):
+    preferred_dish = []
+    for dish in dish_ingredient_dict:
+        if all(i[preference] == True for i in dish_ingredient_dict[dish]):
+            preferred_dish.append(
+                {
+                    "id": dish.id,
+                    "name": dish.name,
+                    "served at": dish.served_at_id,
+                    "price in cents": dish.price_in_cents,
+                }
+            )
+    return preferred_dish
 
 
 def vegetarian_dishes() -> List[models.Dish]:
@@ -35,27 +43,50 @@ def vegetarian_dishes() -> List[models.Dish]:
     Query the database to return a list of dishes that contain only
     vegetarian ingredients.
     #"""
-    not_vegetarian_ingredients = models.Ingredient.select().where(
-        models.Ingredient.is_vegetarian == False
-    )
-    not_vegetarian_ingredients_list = []
-    for i in not_vegetarian_ingredients:
-        not_vegetarian_ingredients_list.append(i.id)
-
-    dishes_ingredients = models.DishIngredient.select()
-    not_vegetarian_dish_id = []
-    for i in dishes_ingredients:
-        if i.ingredient_id in not_vegetarian_ingredients_list:
-            not_vegetarian_dish_id.append(i.dish_id)
 
     all_dishes = models.Dish.select()
-    vegetarian_dish_only = []
-    for i in all_dishes:
-        if i.id not in not_vegetarian_dish_id:
-            vegetarian_dish_only.append(i)
 
-    print(vegetarian_dish_only)
-    return vegetarian_dish_only
+    dish_ingredient_dict = {}
+    for dish in all_dishes:
+        dish_ingredient_dict[dish] = []
+        ingredients = models.DishIngredient.select().where(
+            models.DishIngredient.dish_id == dish.id
+        )
+        for ingredient in ingredients:
+            ingredient_dict = (
+                models.Ingredient.select()
+                .where(models.Ingredient.id == ingredient.ingredient_id)
+                .dicts()
+            )
+            for i in ingredient_dict:
+                dish_ingredient_dict[dish] += [i]
+
+    vegetarian_dish = []
+    for dish in dish_ingredient_dict:
+        if all(i["is_vegetarian"] == True for i in dish_ingredient_dict[dish]):
+            vegetarian_dish.append(dish)
+
+    # EXTRA
+    print("VEGETARIAN")
+    print(
+        [
+            i["name"]
+            for i in find_dish_diet_preference(dish_ingredient_dict, "is_vegetarian")
+        ]
+    )
+    print("VEGAN")
+    print(
+        [i["name"] for i in find_dish_diet_preference(dish_ingredient_dict, "is_vegan")]
+    )
+    print("GLUTENFREE")
+    print(
+        [
+            i["name"]
+            for i in find_dish_diet_preference(dish_ingredient_dict, "is_glutenfree")
+        ]
+    )
+
+    return vegetarian_dish
 
 
 def best_average_rating() -> models.Restaurant:
@@ -65,21 +96,15 @@ def best_average_rating() -> models.Restaurant:
     rating on average
     """
     restaurants = models.Restaurant.select()
-    ratings = models.Rating.select()
     restaurant_rating_dict = {}
-    for restaurant in restaurants:
-        restaurant_rating_dict[restaurant.id] = []
-        for rating in ratings:
-            if rating.restaurant_id == restaurant.id:
-                restaurant_rating_dict[restaurant.id] += [rating.rating]
-        restaurant_rating_dict[restaurant.id] = sum(
-            restaurant_rating_dict[restaurant.id]
-        ) / len(restaurant_rating_dict[restaurant.id])
-    best_rating = max(restaurant_rating_dict, key=restaurant_rating_dict.get)
+    for i in restaurants:
+        restaurant_rating_dict[i] = (
+            models.Rating.select(peewee.fn.AVG(models.Rating.rating))
+            .where(models.Rating.restaurant_id == i)
+            .scalar()
+        )
 
-    print(best_rating)
-    final_answer = models.Restaurant.get(best_rating)
-    return final_answer
+    return max(restaurant_rating_dict, key=restaurant_rating_dict.get)
 
 
 def add_rating_to_restaurant() -> None:
@@ -90,11 +115,6 @@ def add_rating_to_restaurant() -> None:
 
     models.Rating.create(restaurant=4, rating=5, comment="it works yeeey")
 
-    ...
-
-
-# add_rating_to_restaurant()
-
 
 def dinner_date_possible() -> List[models.Restaurant]:
     """You have asked someone out on a dinner date, but where to go?
@@ -102,45 +122,21 @@ def dinner_date_possible() -> List[models.Restaurant]:
     You want to eat at around 19:00 and your date is vegan.
     Query a list of restaurants that account for these constraints.
     """
-    vegan_ingredients = models.Ingredient.select().where(
-        models.Ingredient.is_vegan == True
-    )
-    vegan_ingredients_ids = []
-    for i in vegan_ingredients:
-        vegan_ingredients_ids.append(i.id)
-
     restaurants = models.Restaurant.select().where(
         models.Restaurant.closing_time > "18:59:00"
     )
-    dishes = models.Dish.select()
-    dish_ingredients = models.DishIngredient.select()
-    test = []
+
+    possible_restaurants = []
     for restaurant in restaurants:
-        for dish in dishes:
-            if restaurant.id == dish.served_at_id:
-                test.append(dish)
+        if any(
+            [
+                all([i.is_vegan for i in dish.ingredients])
+                for dish in restaurant.dish_set.select()
+            ]
+        ):
+            possible_restaurants.append(restaurant)
 
-    dish_dict = {}
-    for dish in test:
-        dish_dict[dish] = []
-        for ingredient in dish_ingredients:
-            if ingredient.dish_id == dish.id:
-                dish_dict[dish] += [ingredient.ingredient_id]
-
-    vegan_dish = ""
-    for dish in dish_dict:
-        if all(i in vegan_ingredients_ids for i in dish_dict[dish]):
-            vegan_dish = dish
-    print("test", vegan_dish)
-    restaurant_id = models.Dish.get(12)
-    print(restaurant_id.served_at_id)
-    final_answer = []
-    final_answer.append(models.Restaurant.get(restaurant_id.served_at_id))
-
-    return final_answer
-
-
-dinner_date_possible()
+    return possible_restaurants
 
 
 def add_dish_to_menu() -> models.Dish:
@@ -152,7 +148,6 @@ def add_dish_to_menu() -> models.Dish:
     new ingredients however.
     Return your newly created dish
     """
-    print("test")
 
     dish = models.Dish.create(
         name="A Crappy Dish",
@@ -162,8 +157,3 @@ def add_dish_to_menu() -> models.Dish:
     dish.ingredients.add([7, 5, 8])
 
     return dish
-
-    ...
-
-
-# add_dish_to_menu()
