@@ -37,13 +37,7 @@ def find_dish_diet_preference(dish_ingredient_dict, preference):
     return preferred_dish
 
 
-def vegetarian_dishes() -> List[models.Dish]:
-    """You'd like to know what vegetarian dishes are available
-
-    Query the database to return a list of dishes that contain only
-    vegetarian ingredients.
-    #"""
-
+def make_dish_options():
     all_dishes = models.Dish.select()
 
     dish_ingredient_dict = {}
@@ -53,58 +47,82 @@ def vegetarian_dishes() -> List[models.Dish]:
             models.DishIngredient.dish_id == dish.id
         )
         for ingredient in ingredients:
-            ingredient_dict = (
+            for i in (
                 models.Ingredient.select()
                 .where(models.Ingredient.id == ingredient.ingredient_id)
                 .dicts()
-            )
-            for i in ingredient_dict:
+            ):
                 dish_ingredient_dict[dish] += [i]
 
-    vegetarian_dish = []
-    for dish in dish_ingredient_dict:
-        if all(i["is_vegetarian"] == True for i in dish_ingredient_dict[dish]):
-            vegetarian_dish.append(dish)
+    diet_preference = ["is_vegetarian", "is_vegan", "is_glutenfree"]
 
-    # EXTRA
-    print("VEGETARIAN")
-    print(
+    diet_dict = {}
+    for diet in diet_preference:
+        diet_dict[diet] = []
         [
-            i["name"]
-            for i in find_dish_diet_preference(dish_ingredient_dict, "is_vegetarian")
+            diet_dict[diet].append(
+                f"{i['name']} cost {str(i['price in cents'])[:-2]} euro is served at {models.Restaurant.get(models.Restaurant.id == i['served at']).name}"
+            )
+            for i in find_dish_diet_preference(dish_ingredient_dict, diet)
         ]
-    )
-    print("VEGAN")
-    print(
-        [i["name"] for i in find_dish_diet_preference(dish_ingredient_dict, "is_vegan")]
-    )
-    print("GLUTENFREE")
-    print(
-        [
-            i["name"]
-            for i in find_dish_diet_preference(dish_ingredient_dict, "is_glutenfree")
-        ]
-    )
 
-    return vegetarian_dish
+    [
+        (print(diet), print(""), [print(i) for i in diet_dict[diet]], print(""))
+        for diet in diet_dict
+    ]
 
 
+make_dish_options()
+
+
+def vegetarian_dishes() -> List[models.Dish]:
+    """You'd like to know what vegetarian dishes are available
+
+    Query the database to return a list of dishes that contain only
+    vegetarian ingredients.
+    #"""
+    return [
+        dish
+        for dish in models.Dish.select()
+        if all([i.is_vegetarian for i in dish.ingredients])
+    ]
+
+
+# my way
+# def best_average_rating() -> models.Restaurant:
+#     """You want to know what restaurant is best
+
+#     Query the database to retrieve the restaurant that has the highest
+#     rating on average
+#     """
+#     restaurants = models.Restaurant.select()
+#     restaurant_rating_dict = {}
+#     for i in restaurants:
+#         restaurant_rating_dict[i] = (
+#             models.Rating.select(peewee.fn.AVG(models.Rating.rating))
+#             .where(models.Rating.restaurant_id == i)
+#             .scalar()
+#         )
+
+#     return max(restaurant_rating_dict, key=restaurant_rating_dict.get)
+
+
+# the solution
 def best_average_rating() -> models.Restaurant:
     """You want to know what restaurant is best
 
     Query the database to retrieve the restaurant that has the highest
     rating on average
     """
-    restaurants = models.Restaurant.select()
-    restaurant_rating_dict = {}
-    for i in restaurants:
-        restaurant_rating_dict[i] = (
-            models.Rating.select(peewee.fn.AVG(models.Rating.rating))
-            .where(models.Rating.restaurant_id == i)
-            .scalar()
+    return (
+        models.Restaurant.select(
+            models.Restaurant, peewee.fn.AVG(models.Rating.rating).alias("average")
         )
-
-    return max(restaurant_rating_dict, key=restaurant_rating_dict.get)
+        .join(models.Rating)
+        .group_by(models.Restaurant)
+        .order_by(peewee.fn.AVG(models.Rating.rating).desc())
+        .first()
+    )
 
 
 def add_rating_to_restaurant() -> None:

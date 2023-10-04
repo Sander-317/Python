@@ -7,8 +7,10 @@ install()
 
 def main():
     print("test")
+    delete_database()
+    print("database deleted")
     setup_data()
-    # delete_database()
+    print("database started")
 
 
 def setup_data():
@@ -18,6 +20,7 @@ def setup_data():
             models.Tag,
             models.User,
             models.Product,
+            models.ProductTags,
             #  models.Transaction
         ]
     )
@@ -33,6 +36,7 @@ def setup_data():
                     "ferry fancy hat",
                     10000,
                     2,
+                    (["hats", "pants", "space", "test"]),
                 ),
             ],
         ),
@@ -44,20 +48,40 @@ def setup_data():
                     "ferry fancy shirt",
                     60000,
                     1,
+                    (
+                        [
+                            "hats",
+                            "pants",
+                            "test",
+                        ]
+                    ),
                 ),
             ],
         ),
     ]
 
+    # tag_map = models.Tag.create()
+
     for user, products in user_data:
         user = models.User.create(name=user[0], address=user[1], billing_info=user[2])
         for product in products:
-            product = models.Product.create(
+            new_product = models.Product.create(
                 name=product[0],
                 description=product[1],
                 price_in_cents=product[2],
                 quantity=product[3],
+                tag=[],
             )
+            for i in product[4]:
+                current_tags = []
+                [
+                    current_tags.append(i.name)
+                    for i in models.Tag.select(models.Tag.name)
+                ]
+                if i not in current_tags:
+                    models.Tag.create(name=i)
+                print(models.Tag.get(models.Tag.name == i).id)
+                new_product.tag.add(models.Tag.get(models.Tag.name == i).id)
 
     # product_data = [
     #     (
