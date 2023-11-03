@@ -10,10 +10,10 @@ Alternatively you can use :memory: in models.py to prevent wincpy from using you
 
 def main():
     """
-    Comment out the fuction you are not using and run the file.
+    Comment out the function you are not using and run the file.
     """
-    # setup_data()
-    delete_database()
+    setup_data()
+    # delete_database()
 
 
 def setup_data():
@@ -151,7 +151,7 @@ def delete_database():
     Delete the database.
     """
     cwd = os.getcwd()
-    database_path = os.path.join(cwd, "database.db")
+    database_path = os.path.join(cwd, "peewee-orm/database.db")
     if os.path.exists(database_path):
         os.remove(database_path)
 

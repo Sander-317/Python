@@ -17,8 +17,6 @@ install()
 def search(term):
     search_term = TextBlob(term)
     terms = [term, search_term.correct()]
-    terms.append(search_term.correct())
-    terms.append(term)
     products = models.Product.select()
     search_results = []
     for i in terms:

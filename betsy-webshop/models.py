@@ -30,7 +30,6 @@ class User(peewee.Model):
     address = peewee.CharField()
     billing_info = peewee.CharField()
     owned_products = peewee.ManyToManyField(Product)
-    bought_products = peewee.ManyToManyField(Product)
 
     class Meta:
         database = db
